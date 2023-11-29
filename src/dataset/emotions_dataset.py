@@ -36,6 +36,7 @@ class EmotionsDataset(Dataset):
     def __init__(self, csv_file):
         self.data = pd.read_csv(csv_file)
         self.vocab = self.build_vocab()
+        self.emotions = list(self.data["Emotion"].unique())
 
     def __len__(self):
         return len(self.data)
@@ -171,21 +172,33 @@ class EmotionsDataset(Dataset):
         emotion_one_hot[emotion] = 1
         return emotion_one_hot
 
+    def process_text(self, text: str):
+        """
+        Processes the given text by cleaning, tokenizing, lemmatizing, and turning it into indices.
+
+        Args:
+            text (str): The text to be processed.
+
+        Returns:
+            torch.Tensor: The processed text.
+        """
+        text = self.clean_text(text)
+        text = self.remove_stop_words(text)
+        text = self.tokenize(text, char_based=False, fix_length=config.WORDS_PER_SAMPLE)
+        text = self.lemmatize(text)
+        text = self.turn_to_indices(text, self.vocab)
+        return text
+
     def __getitem__(self, idx):
         # Implement your own logic to retrieve data from the dataset
         sample = self.data.iloc[idx]
 
         # Clean the text
-        text = self.clean_text(sample["Text"])
-        text = self.remove_stop_words(text)
-        text = self.tokenize(text, char_based=False, fix_length=config.WORDS_PER_SAMPLE)
-        text = self.lemmatize(text)
-        text = self.turn_to_indices(text, self.vocab)
+        text = self.process_text(sample["Text"])
 
         # Encode emotion to one-hot vector
-        emotions = self.data["Emotion"].unique()
         emotion = sample["Emotion"]
-        emotion = list(emotions).index(emotion)
+        emotion = list(self.emotions).index(emotion)
         emotion_one_hot = self.encode_emotion(emotion, config.NUM_EMOTIONS)
 
         # Return the sample as a dictionary or tuple
